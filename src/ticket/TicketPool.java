@@ -20,4 +20,8 @@ public interface TicketPool {
     double getTotalUnsoldValue();
 
     String getPoolInfo();
+
+    String getLogs();
+
+    void logReaderMessage(String msg);
 }
