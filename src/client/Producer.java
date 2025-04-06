@@ -29,7 +29,7 @@ public class Producer implements Runnable {
             while (running) {
                 pool.addTicket(new Ticket(
                         "[" + Thread.currentThread().getName() + "]-" + (++count),
-                        "Event",
+                        "Tomorrowland",
                         TICKET_PRICE
                 ));
                 Thread.sleep(1000 / rate);
