@@ -169,7 +169,7 @@ public class ReentrantLockTicketPool implements TicketPool {
         writeLock.lock();
         try {
             String time = logTime();
-            String entry = time + " [Reader] " + msg;
+            String entry = time + " [" + Thread.currentThread().getName() + "] " + msg;
             logs.add(entry);
         } finally {
             writeLock.unlock();
