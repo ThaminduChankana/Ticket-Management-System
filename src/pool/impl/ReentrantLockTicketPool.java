@@ -7,17 +7,23 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class ReentrantLockTicketPool implements TicketPool {
     private final List<Ticket> tickets;
     private final int capacity;
 
-    private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
-    private final Lock readLock = rwLock.readLock();
-    private final Lock writeLock = rwLock.writeLock();
-    // Store logs in memory
+    // Custom read-write lock implementation
+    private final Lock lock = new ReentrantLock();
+    private final Condition readCondition = lock.newCondition();
+    private final Condition writeCondition = lock.newCondition();
+    private int readers = 0;
+    private int writers = 0;
+    private int writeRequests = 0;
+
+    // State tracking
     private final List<String> logs = new ArrayList<>();
     private int added = 0;
     private int purchased = 0;
@@ -30,16 +36,66 @@ public class ReentrantLockTicketPool implements TicketPool {
         this.tickets = new ArrayList<>(capacity);
     }
 
+    // Custom read-write lock implementation
+    private void acquireReadLock() throws InterruptedException {
+        lock.lock();
+        try {
+            while (writers > 0 || writeRequests > 0) {
+                readCondition.await();
+            }
+            readers++;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    private void releaseReadLock() {
+        lock.lock();
+        try {
+            readers--;
+            if (readers == 0) {
+                writeCondition.signal();
+            }
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    private void acquireWriteLock() throws InterruptedException {
+        lock.lock();
+        try {
+            writeRequests++;
+            while (readers > 0 || writers > 0) {
+                writeCondition.await();
+            }
+            writeRequests--;
+            writers++;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    private void releaseWriteLock() {
+        lock.lock();
+        try {
+            writers--;
+            writeCondition.signal();
+            readCondition.signalAll();
+        } finally {
+            lock.unlock();
+        }
+    }
+
     @Override
     public boolean addTicket(Ticket ticket) throws InterruptedException {
-        writeLock.lock();
+        acquireWriteLock();
         try {
             while (tickets.size() == capacity) {
                 logWait("FULL");
-                // Release lock so others can proceed
-                writeLock.unlock();
+                // Release lock temporarily to allow other operations
+                releaseWriteLock();
                 Thread.sleep(100);
-                writeLock.lock();
+                acquireWriteLock();
             }
             tickets.add(ticket);
             added++;
@@ -47,20 +103,20 @@ public class ReentrantLockTicketPool implements TicketPool {
             logAction("Added", ticket);
             return true;
         } finally {
-            writeLock.unlock();
+            releaseWriteLock();
         }
     }
 
     @Override
     public Ticket purchaseTicket() throws InterruptedException {
-        writeLock.lock();
+        acquireWriteLock();
         try {
             while (tickets.isEmpty()) {
                 logWait("EMPTY");
-                // Release lock so others can proceed
-                writeLock.unlock();
+                // Release lock temporarily to allow other operations
+                releaseWriteLock();
                 Thread.sleep(100);
-                writeLock.lock();
+                acquireWriteLock();
             }
             Ticket t = tickets.remove(0);
             purchased++;
@@ -68,115 +124,141 @@ public class ReentrantLockTicketPool implements TicketPool {
             logAction("Consumed", t);
             return t;
         } finally {
-            writeLock.unlock();
+            releaseWriteLock();
         }
     }
 
     @Override
     public void performExclusiveUpdate() throws InterruptedException {
-        writeLock.lock();
+        acquireWriteLock();
         try {
             version++;
             logUpdate();
         } finally {
-            writeLock.unlock();
+            releaseWriteLock();
         }
     }
 
     @Override
     public int getAvailableTickets() {
-        readLock.lock();
         try {
+            acquireReadLock();
             return tickets.size();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return 0;
         } finally {
-            readLock.unlock();
+            releaseReadLock();
         }
     }
 
     @Override
     public int getAddedTickets() {
-        readLock.lock();
         try {
+            acquireReadLock();
             return added;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return 0;
         } finally {
-            readLock.unlock();
+            releaseReadLock();
         }
     }
 
     @Override
     public int getPurchasedTickets() {
-        readLock.lock();
         try {
+            acquireReadLock();
             return purchased;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return 0;
         } finally {
-            readLock.unlock();
+            releaseReadLock();
         }
     }
 
     @Override
     public int getVersion() {
-        readLock.lock();
         try {
+            acquireReadLock();
             return version;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return 0;
         } finally {
-            readLock.unlock();
+            releaseReadLock();
         }
     }
 
     @Override
     public double getTotalRevenue() {
-        readLock.lock();
         try {
+            acquireReadLock();
             return totalRevenue;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return 0.0;
         } finally {
-            readLock.unlock();
+            releaseReadLock();
         }
     }
 
     @Override
     public double getTotalUnsoldValue() {
-        readLock.lock();
         try {
+            acquireReadLock();
             return tickets.stream().mapToDouble(Ticket::getPrice).sum();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return 0.0;
         } finally {
-            readLock.unlock();
+            releaseReadLock();
         }
     }
 
     @Override
     public String getPoolInfo() {
-        readLock.lock();
         try {
-            return String.format("[ReentrantLock] Tickets left : %d/%d, Added: %d, Purchased: %d, Version: %d",
+            acquireReadLock();
+            return String.format("[CustomLock] Tickets left : %d/%d, Added: %d, Purchased: %d, Version: %d",
                     tickets.size(), capacity, added, purchased, version);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return "[Interrupted]";
         } finally {
-            readLock.unlock();
+            releaseReadLock();
         }
     }
 
     @Override
     public String getLogs() {
-        readLock.lock();
         try {
+            acquireReadLock();
             return String.join("\n", logs);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return "";
         } finally {
-            readLock.unlock();
+            releaseReadLock();
         }
     }
 
     @Override
     public void logReaderMessage(String msg) {
-        writeLock.lock();
         try {
+            acquireWriteLock();
             String time = logTime();
             String entry = time + " [" + Thread.currentThread().getName() + "] " + msg;
             logs.add(entry);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         } finally {
-            writeLock.unlock();
+            releaseWriteLock();
         }
     }
 
-    // ------------------ Logging Helpers (no direct prints) ------------------
+    // Logging helpers
     private void logWait(String state) {
         String msg = logTime() + " [" + Thread.currentThread().getName() + "] waiting (Pool " + state + ")";
         logs.add(msg);
