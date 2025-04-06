@@ -1,7 +1,8 @@
-package pool.impl;
+package org.concurrent.pool.impl;
 
-import model.Ticket;
-import pool.TicketPool;
+
+import org.concurrent.model.Ticket;
+import org.concurrent.pool.TicketPool;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -19,12 +20,11 @@ public class ReentrantLockTicketPool implements TicketPool {
     private final Lock lock = new ReentrantLock();
     private final Condition readCondition = lock.newCondition();
     private final Condition writeCondition = lock.newCondition();
+    // State tracking
+    private final List<String> logs = new ArrayList<>();
     private int readers = 0;
     private int writers = 0;
     private int writeRequests = 0;
-
-    // State tracking
-    private final List<String> logs = new ArrayList<>();
     private int added = 0;
     private int purchased = 0;
     private int version = 0;

@@ -1,13 +1,14 @@
-package util;
+package org.concurrent.util;
 
-import pool.TicketPool;
 
-public class Reader implements Runnable {
+import org.concurrent.pool.TicketPool;
+
+public class Writer implements Runnable {
     private final TicketPool pool;
     private volatile boolean running = true;
     private int rate;
 
-    public Reader(TicketPool pool, int rate) {
+    public Writer(TicketPool pool, int rate) {
         this.pool = pool;
         this.rate = rate;
     }
@@ -24,11 +25,7 @@ public class Reader implements Runnable {
     public void run() {
         try {
             while (running) {
-                // Instead of printing here, we log to the pool:
-                String info = pool.getPoolInfo();
-                pool.logReaderMessage("reads from " + info);
-
-                // Sleep
+                pool.performExclusiveUpdate();
                 Thread.sleep(1000 / rate);
             }
         } catch (InterruptedException e) {

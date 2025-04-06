@@ -1,11 +1,13 @@
-import client.Consumer;
-import client.Producer;
-import pool.TicketPool;
-import pool.impl.BlockingQueueTicketPool;
-import pool.impl.ReentrantLockTicketPool;
-import pool.impl.SynchronizedTicketPool;
-import util.Reader;
-import util.Writer;
+package org.concurrent;
+
+import org.concurrent.client.Consumer;
+import org.concurrent.client.Producer;
+import org.concurrent.pool.TicketPool;
+import org.concurrent.pool.impl.BlockingQueueTicketPool;
+import org.concurrent.pool.impl.ReentrantLockTicketPool;
+import org.concurrent.pool.impl.SynchronizedTicketPool;
+import org.concurrent.util.Reader;
+import org.concurrent.util.Writer;
 
 import java.util.ArrayList;
 import java.util.List;

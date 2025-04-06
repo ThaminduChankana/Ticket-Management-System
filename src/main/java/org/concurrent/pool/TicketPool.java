@@ -1,6 +1,7 @@
-package pool;
+package org.concurrent.pool;
 
-import model.Ticket;
+
+import org.concurrent.model.Ticket;
 
 public interface TicketPool {
     boolean addTicket(Ticket ticket) throws InterruptedException;

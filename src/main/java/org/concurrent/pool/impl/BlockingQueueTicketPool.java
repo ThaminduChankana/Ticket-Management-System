@@ -1,7 +1,7 @@
-package pool.impl;
+package org.concurrent.pool.impl;
 
-import model.Ticket;
-import pool.TicketPool;
+import org.concurrent.model.Ticket;
+import org.concurrent.pool.TicketPool;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;

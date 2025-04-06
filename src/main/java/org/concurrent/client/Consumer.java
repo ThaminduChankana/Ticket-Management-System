@@ -1,6 +1,7 @@
-package client;
+package org.concurrent.client;
 
-import pool.TicketPool;
+
+import org.concurrent.pool.TicketPool;
 
 public class Consumer implements Runnable {
     private final TicketPool pool;

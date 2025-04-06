@@ -1,13 +1,16 @@
-package util;
+package org.concurrent.client;
 
-import pool.TicketPool;
 
-public class Writer implements Runnable {
+import org.concurrent.model.Ticket;
+import org.concurrent.pool.TicketPool;
+
+public class Producer implements Runnable {
+    private static final double TICKET_PRICE = 100.0;
     private final TicketPool pool;
     private volatile boolean running = true;
     private int rate;
 
-    public Writer(TicketPool pool, int rate) {
+    public Producer(TicketPool pool, int rate) {
         this.pool = pool;
         this.rate = rate;
     }
@@ -23,8 +26,13 @@ public class Writer implements Runnable {
     @Override
     public void run() {
         try {
+            int count = 0;
             while (running) {
-                pool.performExclusiveUpdate();
+                pool.addTicket(new Ticket(
+                        "[" + Thread.currentThread().getName() + "]-" + (++count),
+                        "Tomorrowland",
+                        TICKET_PRICE
+                ));
                 Thread.sleep(1000 / rate);
             }
         } catch (InterruptedException e) {

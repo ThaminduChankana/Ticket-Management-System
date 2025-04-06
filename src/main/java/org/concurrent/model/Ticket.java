@@ -1,4 +1,4 @@
-package model;
+package org.concurrent.model;
 
 public class Ticket {
     private final String id;
