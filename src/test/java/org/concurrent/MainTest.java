@@ -9,10 +9,6 @@ import java.io.PrintStream;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * This test class simulates several command sessions for the Main class.
- * It replaces System.in with scripted input and captures System.out output.
- */
 class MainTest {
 
     private String runMainWithInput(String input) throws InterruptedException {

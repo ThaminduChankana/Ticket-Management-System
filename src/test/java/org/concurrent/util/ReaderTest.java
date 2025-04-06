@@ -9,9 +9,6 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * Test the Reader class which logs the current pool info.
- */
 class ReaderTest {
 
     private TicketPool pool;

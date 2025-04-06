@@ -8,9 +8,6 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/**
- * Test the Writer class which performs exclusive updates on the pool.
- */
 class WriterTest {
 
     private TicketPool pool;
