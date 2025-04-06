@@ -78,11 +78,12 @@ public class Main {
                     break;
 
                 case "addproducer":
-                    if (parts.length < 2) {
-                        System.out.println("Usage: addProducer <rate>");
-                        break;
+                    int pRate = produceRate;
+                    if (parts.length >= 2) {
+                        pRate = Integer.parseInt(parts[1]);
+                    } else {
+                        System.out.println("Using default rate " + produceRate + " for producer.");
                     }
-                    int pRate = Integer.parseInt(parts[1]);
                     Producer p = new Producer(pool, pRate);
                     producers.add(p);
                     Thread pThread = new Thread(p, "Producer-" + (++producerCount));
@@ -111,11 +112,12 @@ public class Main {
                     break;
 
                 case "addconsumer":
-                    if (parts.length < 2) {
-                        System.out.println("Usage: addConsumer <rate>");
-                        break;
+                    int cRate = consumeRate;
+                    if (parts.length >= 2) {
+                        cRate = Integer.parseInt(parts[1]);
+                    } else {
+                        System.out.println("Using default rate " + consumeRate + " for consumer.");
                     }
-                    int cRate = Integer.parseInt(parts[1]);
                     Consumer c = new Consumer(pool, cRate);
                     consumers.add(c);
                     Thread cThread = new Thread(c, "Consumer-" + (++consumerCount));
@@ -144,11 +146,12 @@ public class Main {
                     break;
 
                 case "addwriter":
-                    if (parts.length < 2) {
-                        System.out.println("Usage: addWriter <rate>");
-                        break;
+                    int wRate = writeRate;
+                    if (parts.length >= 2) {
+                        wRate = Integer.parseInt(parts[1]);
+                    } else {
+                        System.out.println("Using default rate " + writeRate + " for writer.");
                     }
-                    int wRate = Integer.parseInt(parts[1]);
                     Writer w = new Writer(pool, wRate);
                     writers.add(w);
                     Thread wThread = new Thread(w, "Writer-" + (++writerCount));
@@ -177,11 +180,12 @@ public class Main {
                     break;
 
                 case "addreader":
-                    if (parts.length < 2) {
-                        System.out.println("Usage: addReader <rate>");
-                        break;
+                    int rRate = readRate;
+                    if (parts.length >= 2) {
+                        rRate = Integer.parseInt(parts[1]);
+                    } else {
+                        System.out.println("Using default rate " + readRate + " for reader.");
                     }
-                    int rRate = Integer.parseInt(parts[1]);
                     Reader r = new Reader(pool, rRate);
                     readers.add(r);
                     Thread rThread = new Thread(r, "Reader-" + (++readerCount));
@@ -303,15 +307,15 @@ public class Main {
         System.out.println("Commands:");
         System.out.println("  help                 - Show this help message");
         System.out.println("  status               - Display the ticket pool’s real-time state");
-        System.out.println("  addProducer <rate>   - Dynamically add a producer with given rate");
-        System.out.println("  removeProducer <idx> - Remove the producer at index <idx> (1-based)");
-        System.out.println("  addConsumer <rate>   - Dynamically add a consumer with given rate");
-        System.out.println("  removeConsumer <idx> - Remove the consumer at index <idx>");
-        System.out.println("  addWriter <rate>     - Dynamically add a writer with given rate");
-        System.out.println("  removeWriter <idx>   - Remove the writer at index <idx>");
-        System.out.println("  addReader <rate>     - Dynamically add a reader with given rate");
-        System.out.println("  removeReader <idx>   - Remove the reader at index <idx>");
-        System.out.println("  logs                 - Tail all logs (new lines) for 10 seconds");
-        System.out.println("  exit                 - Stop everything and exit");
+        System.out.println("  addProducer [rate]    - Add producer (default rate: 2)");
+        System.out.println("  removeProducer <idx>  - Remove producer at 1-based index");
+        System.out.println("  addConsumer [rate]    - Add consumer (default rate: 2)");
+        System.out.println("  removeConsumer <idx>  - Remove consumer at index");
+        System.out.println("  addWriter [rate]      - Add writer (default rate: 1)");
+        System.out.println("  removeWriter <idx>    - Remove writer at index");
+        System.out.println("  addReader [rate]      - Add reader (default rate: 1)");
+        System.out.println("  removeReader <idx>    - Remove reader at index");
+        System.out.println("  logs                 - Tail logs for 10 seconds");
+        System.out.println("  exit                 - Exit program");
     }
 }
