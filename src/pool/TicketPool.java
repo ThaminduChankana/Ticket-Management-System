@@ -1,4 +1,6 @@
-package ticket;
+package pool;
+
+import model.Ticket;
 
 public interface TicketPool {
     boolean addTicket(Ticket ticket) throws InterruptedException;

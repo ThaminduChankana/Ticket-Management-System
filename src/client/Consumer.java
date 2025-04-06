@@ -1,6 +1,6 @@
 package client;
 
-import ticket.TicketPool;
+import pool.TicketPool;
 
 public class Consumer implements Runnable {
     private final TicketPool pool;

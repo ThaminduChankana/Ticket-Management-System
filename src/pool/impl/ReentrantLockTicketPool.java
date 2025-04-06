@@ -1,4 +1,7 @@
-package ticket;
+package pool.impl;
+
+import model.Ticket;
+import pool.TicketPool;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;

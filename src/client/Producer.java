@@ -1,7 +1,7 @@
 package client;
 
-import ticket.Ticket;
-import ticket.TicketPool;
+import model.Ticket;
+import pool.TicketPool;
 
 public class Producer implements Runnable {
     private static final double TICKET_PRICE = 100.0;

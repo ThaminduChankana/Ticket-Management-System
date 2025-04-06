@@ -1,9 +1,9 @@
 import client.Consumer;
 import client.Producer;
-import ticket.BlockingQueueTicketPool;
-import ticket.ReentrantLockTicketPool;
-import ticket.SynchronizedTicketPool;
-import ticket.TicketPool;
+import pool.impl.BlockingQueueTicketPool;
+import pool.impl.ReentrantLockTicketPool;
+import pool.impl.SynchronizedTicketPool;
+import pool.TicketPool;
 import util.Reader;
 import util.Writer;
 

@@ -1,6 +1,6 @@
 package util;
 
-import ticket.TicketPool;
+import pool.TicketPool;
 
 public class Writer implements Runnable {
     private final TicketPool pool;

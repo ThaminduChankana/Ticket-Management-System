@@ -1,4 +1,4 @@
-package ticket;
+package model;
 
 public class Ticket {
     private final String id;
