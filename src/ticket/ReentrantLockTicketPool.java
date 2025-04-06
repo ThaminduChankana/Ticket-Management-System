@@ -10,9 +10,12 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 public class ReentrantLockTicketPool implements TicketPool {
     private final List<Ticket> tickets;
     private final int capacity;
+
     private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
     private final Lock readLock = rwLock.readLock();
     private final Lock writeLock = rwLock.writeLock();
+    // Store logs in memory
+    private final List<String> logs = new ArrayList<>();
     private int added = 0;
     private int purchased = 0;
     private int version = 0;
@@ -24,11 +27,13 @@ public class ReentrantLockTicketPool implements TicketPool {
         this.tickets = new ArrayList<>(capacity);
     }
 
+    @Override
     public boolean addTicket(Ticket ticket) throws InterruptedException {
         writeLock.lock();
         try {
             while (tickets.size() == capacity) {
                 logWait("FULL");
+                // Release lock so others can proceed
                 writeLock.unlock();
                 Thread.sleep(100);
                 writeLock.lock();
@@ -43,11 +48,13 @@ public class ReentrantLockTicketPool implements TicketPool {
         }
     }
 
+    @Override
     public Ticket purchaseTicket() throws InterruptedException {
         writeLock.lock();
         try {
             while (tickets.isEmpty()) {
                 logWait("EMPTY");
+                // Release lock so others can proceed
                 writeLock.unlock();
                 Thread.sleep(100);
                 writeLock.lock();
@@ -62,7 +69,8 @@ public class ReentrantLockTicketPool implements TicketPool {
         }
     }
 
-    public void performExclusiveUpdate() {
+    @Override
+    public void performExclusiveUpdate() throws InterruptedException {
         writeLock.lock();
         try {
             version++;
@@ -72,6 +80,7 @@ public class ReentrantLockTicketPool implements TicketPool {
         }
     }
 
+    @Override
     public int getAvailableTickets() {
         readLock.lock();
         try {
@@ -81,6 +90,7 @@ public class ReentrantLockTicketPool implements TicketPool {
         }
     }
 
+    @Override
     public int getAddedTickets() {
         readLock.lock();
         try {
@@ -90,6 +100,7 @@ public class ReentrantLockTicketPool implements TicketPool {
         }
     }
 
+    @Override
     public int getPurchasedTickets() {
         readLock.lock();
         try {
@@ -99,6 +110,7 @@ public class ReentrantLockTicketPool implements TicketPool {
         }
     }
 
+    @Override
     public int getVersion() {
         readLock.lock();
         try {
@@ -108,6 +120,7 @@ public class ReentrantLockTicketPool implements TicketPool {
         }
     }
 
+    @Override
     public double getTotalRevenue() {
         readLock.lock();
         try {
@@ -117,6 +130,7 @@ public class ReentrantLockTicketPool implements TicketPool {
         }
     }
 
+    @Override
     public double getTotalUnsoldValue() {
         readLock.lock();
         try {
@@ -126,6 +140,7 @@ public class ReentrantLockTicketPool implements TicketPool {
         }
     }
 
+    @Override
     public String getPoolInfo() {
         readLock.lock();
         try {
@@ -136,19 +151,42 @@ public class ReentrantLockTicketPool implements TicketPool {
         }
     }
 
+    @Override
+    public String getLogs() {
+        readLock.lock();
+        try {
+            return String.join("\n", logs);
+        } finally {
+            readLock.unlock();
+        }
+    }
+
+    @Override
+    public void logReaderMessage(String msg) {
+        writeLock.lock();
+        try {
+            String time = logTime();
+            String entry = time + " [Reader] " + msg;
+            logs.add(entry);
+        } finally {
+            writeLock.unlock();
+        }
+    }
+
+    // ------------------ Logging Helpers (no direct prints) ------------------
     private void logWait(String state) {
-        System.out.println(logTime() + " " + "[" + Thread.currentThread().getName() + "]"
-                + " waiting (Pool " + state + ")");
+        String msg = logTime() + " [" + Thread.currentThread().getName() + "] waiting (Pool " + state + ")";
+        logs.add(msg);
     }
 
     private void logAction(String action, Ticket t) {
-        System.out.println(logTime() + " " + "[" + Thread.currentThread().getName() + "]"
-                + " " + action + " " + t);
+        String msg = logTime() + " [" + Thread.currentThread().getName() + "] " + action + " " + t;
+        logs.add(msg);
     }
 
     private void logUpdate() {
-        System.out.println(logTime() + " " + "[" + Thread.currentThread().getName() + "]"
-                + " updated version to " + version);
+        String msg = logTime() + " [" + Thread.currentThread().getName() + "] updated version to " + version;
+        logs.add(msg);
     }
 
     private String logTime() {

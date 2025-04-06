@@ -4,11 +4,15 @@ import ticket.TicketPool;
 
 public class Consumer implements Runnable {
     private final TicketPool pool;
-    private final int rate;
     private volatile boolean running = true;
+    private int rate;
 
     public Consumer(TicketPool pool, int rate) {
         this.pool = pool;
+        this.rate = rate;
+    }
+
+    public void setRate(int rate) {
         this.rate = rate;
     }
 
@@ -16,6 +20,7 @@ public class Consumer implements Runnable {
         running = false;
     }
 
+    @Override
     public void run() {
         try {
             while (running) {

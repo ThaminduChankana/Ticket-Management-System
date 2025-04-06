@@ -2,16 +2,17 @@ package util;
 
 import ticket.TicketPool;
 
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-
 public class Reader implements Runnable {
     private final TicketPool pool;
-    private final int rate;
     private volatile boolean running = true;
+    private int rate;
 
     public Reader(TicketPool pool, int rate) {
         this.pool = pool;
+        this.rate = rate;
+    }
+
+    public void setRate(int rate) {
         this.rate = rate;
     }
 
@@ -19,16 +20,15 @@ public class Reader implements Runnable {
         running = false;
     }
 
-    private String logTime() {
-        return LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss.SSS"));
-    }
-
+    @Override
     public void run() {
         try {
             while (running) {
+                // Instead of printing here, we log to the pool:
                 String info = pool.getPoolInfo();
-                System.out.println(logTime() + " " + "[" + Thread.currentThread().getName() + "]"
-                        + " reads from " + info);
+                pool.logReaderMessage("reads from " + info);
+
+                // Sleep
                 Thread.sleep(1000 / rate);
             }
         } catch (InterruptedException e) {
