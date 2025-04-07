@@ -109,7 +109,7 @@ class MainTest {
     void testSynchronizationMechanismReentrantLock() throws InterruptedException {
         String input = "2\n10\nstatus\nexit\n";
         String output = runMainWithInput(input);
-        assertTrue(output.contains("[CustomLock]"), "Output should indicate usage of ReentrantLock pool");
+        assertTrue(output.contains("[ReentrantLock]"), "Output should indicate usage of ReentrantLock pool");
     }
 
     @Test
