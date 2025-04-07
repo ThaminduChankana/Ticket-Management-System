@@ -13,7 +13,6 @@ import java.util.Queue;
 public class BlockingQueueTicketPool implements TicketPool {
     private final int capacity;
     private final Queue<Ticket> queue;
-    // Store logs in memory
     private final List<String> logs = new ArrayList<>();
     private int added = 0;
     private int purchased = 0;

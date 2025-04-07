@@ -25,11 +25,9 @@ public class Reader implements Runnable {
     public void run() {
         try {
             while (running) {
-                // Instead of printing here, we log to the pool:
                 String info = pool.getPoolInfo();
                 pool.logReaderMessage("reads from " + info);
 
-                // Sleep
                 Thread.sleep(1000 / rate);
             }
         } catch (InterruptedException e) {

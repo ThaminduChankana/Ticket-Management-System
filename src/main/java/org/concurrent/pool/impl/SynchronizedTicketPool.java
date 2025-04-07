@@ -11,7 +11,6 @@ import java.util.List;
 public class SynchronizedTicketPool implements TicketPool {
     private final List<Ticket> tickets;
     private final int capacity;
-    // Store logs in memory
     private final List<String> logs = new ArrayList<>();
     private int added = 0;
     private int purchased = 0;
@@ -106,7 +105,6 @@ public class SynchronizedTicketPool implements TicketPool {
         logs.add(entry);
     }
 
-    // ------------------ Logging Helpers (no direct prints) ------------------
     private void logWait(String state) {
         String msg = logTime() + " [" + Thread.currentThread().getName() + "] waiting (Pool " + state + ")";
         logs.add(msg);

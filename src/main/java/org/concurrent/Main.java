@@ -75,6 +75,7 @@ public class Main {
                     System.out.println(pool.getPoolInfo());
                     System.out.println("Total Tickets Added: " + pool.getAddedTickets());
                     System.out.println("Total Tickets Purchased: " + pool.getPurchasedTickets());
+                    System.out.println("Total tickets left in the pool: " + pool.getAvailableTickets());
                     System.out.printf("Total Sold Value: $%.2f%n", pool.getTotalRevenue());
                     System.out.printf("Total Unsold Value: $%.2f%n", pool.getTotalUnsoldValue());
                     break;
@@ -293,16 +294,12 @@ public class Main {
     }
 
     private static TicketPool createPool(int choice, int capacity) {
-        switch (choice) {
-            case 1:
-                return new SynchronizedTicketPool(capacity);
-            case 2:
-                return new ReentrantLockTicketPool(capacity);
-            case 3:
-                return new BlockingQueueTicketPool(capacity);
-            default:
-                throw new IllegalArgumentException("Invalid choice");
-        }
+        return switch (choice) {
+            case 1 -> new SynchronizedTicketPool(capacity);
+            case 2 -> new ReentrantLockTicketPool(capacity);
+            case 3 -> new BlockingQueueTicketPool(capacity);
+            default -> throw new IllegalArgumentException("Invalid choice");
+        };
     }
 
     private static void printHelp() {
