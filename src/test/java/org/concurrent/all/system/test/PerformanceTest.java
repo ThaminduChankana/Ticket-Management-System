@@ -19,7 +19,7 @@ import java.util.concurrent.locks.LockSupport;
 class PerformanceTest {
     private static final int WARMUP_SECONDS = 5;
     private static final int TEST_SECONDS = 10;
-    private static final int[] THREAD_COUNTS = {1, 4, 16, 64};
+    private static final int[] THREAD_COUNTS = {2, 4, 16, 64};
     private static final int POOL_CAPACITY = 1000;
     private static final double WRITE_RATIO = 0.5;
     private static final int OPERATION_TIMEOUT_MS = 100;
@@ -59,36 +59,57 @@ class PerformanceTest {
         AtomicLong totalOperations = new AtomicLong();
         List<Long> operationTimes = new CopyOnWriteArrayList<>();
 
+        // Split threads into producers and consumers
+        int producerCount = threadCount / 2;
+        int consumerCount = threadCount - producerCount;
+
         // Test duration control
         CountDownLatch startLatch = new CountDownLatch(1);
         AtomicBoolean running = new AtomicBoolean(true);
 
-        // Create tasks
+        // Create producer tasks
         List<Future<?>> futures = new ArrayList<>();
-        for (int i = 0; i < threadCount; i++) {
+        for (int i = 0; i < producerCount; i++) {
             futures.add(executor.submit(() -> {
                 try {
                     startLatch.await();
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
-                }
-                while (running.get()) {
-                    boolean isWrite = ThreadLocalRandom.current().nextDouble() < WRITE_RATIO;
-                    long startTime = System.nanoTime();
-
-                    try {
-                        if (isWrite) {
+                    while (running.get()) {
+                        long startTime = System.nanoTime();
+                        try {
                             pool.addTicket(new Ticket("T", "Event", 100));
-                        } else {
-                            pool.purchaseTicket();
+                            long duration = System.nanoTime() - startTime;
+                            totalOperations.incrementAndGet();
+                            operationTimes.add(duration);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            break;
                         }
-                        long duration = System.nanoTime() - startTime;
-                        totalOperations.incrementAndGet();
-                        operationTimes.add(duration);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        break;
                     }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }));
+        }
+
+        // Create consumer tasks
+        for (int i = 0; i < consumerCount; i++) {
+            futures.add(executor.submit(() -> {
+                try {
+                    startLatch.await();
+                    while (running.get()) {
+                        long startTime = System.nanoTime();
+                        try {
+                            pool.purchaseTicket();
+                            long duration = System.nanoTime() - startTime;
+                            totalOperations.incrementAndGet();
+                            operationTimes.add(duration);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            break;
+                        }
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
                 }
             }));
         }
