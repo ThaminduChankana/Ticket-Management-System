@@ -6,171 +6,186 @@ import org.concurrent.all.pool.TicketPool;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.Queue;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class BlockingQueueTicketPool implements TicketPool {
     private final int capacity;
-    private final BlockingQueue<Ticket> queue;
+    private final Queue<Ticket> queue;
+    private final ReadWriteLock lock = new ReentrantReadWriteLock(true);
+    private final Condition notEmpty = lock.writeLock().newCondition();
+    private final Condition notFull = lock.writeLock().newCondition();
     private final List<String> logs = new ArrayList<>();
-    private final Lock logLock = new ReentrantLock();
-
-    // Stats tracking
-    private AtomicInteger added = new AtomicInteger(0);
-    private AtomicInteger purchased = new AtomicInteger(0);
-    private AtomicInteger version = new AtomicInteger(0);
+    private int added = 0;
+    private int purchased = 0;
+    private int version = 0;
     private double totalRevenue = 0.0;
     private double totalAddedValue = 0.0;
-    private final Lock statsLock = new ReentrantLock();
 
     public BlockingQueueTicketPool(int capacity) {
         this.capacity = capacity;
-        this.queue = new ArrayBlockingQueue<>(capacity);
+        this.queue = new LinkedList<>();
     }
 
     @Override
     public boolean addTicket(Ticket ticket) throws InterruptedException {
-        // This will block if the queue is full
-        boolean added = false;
+        lock.writeLock().lock();
         try {
-            queue.put(ticket);
-            added = true;
-        } finally {
-            if (added) {
-                this.added.incrementAndGet();
-                statsLock.lock();
-                try {
-                    totalAddedValue += ticket.getPrice();
-                } finally {
-                    statsLock.unlock();
-                }
-                logAction("Added", ticket);
+            while (queue.size() == capacity) {
+                logWait("FULL");
+                notFull.await();
             }
+            queue.add(ticket);
+            added++;
+            totalAddedValue += ticket.getPrice();
+            notEmpty.signalAll();
+            logAction("Added", ticket);
+            return true;
+        } finally {
+            lock.writeLock().unlock();
         }
-        return true;
     }
 
     @Override
     public Ticket purchaseTicket() throws InterruptedException {
-        // This will block if the queue is empty
-        Ticket t = queue.take();
-        purchased.incrementAndGet();
-        statsLock.lock();
+        lock.writeLock().lock();
         try {
+            while (queue.isEmpty()) {
+                logWait("EMPTY");
+                notEmpty.await();
+            }
+            Ticket t = queue.poll();
+            purchased++;
             totalRevenue += t.getPrice();
+            notFull.signalAll();
+            logAction("Consumed", t);
+            return t;
         } finally {
-            statsLock.unlock();
+            lock.writeLock().unlock();
         }
-        logAction("Consumed", t);
-        return t;
     }
 
     @Override
-    public void performExclusiveUpdate() throws InterruptedException {
-        int newVersion = version.incrementAndGet();
-        logUpdate(newVersion);
+    public void performExclusiveUpdate() {
+        lock.writeLock().lock();
+        try {
+            version++;
+            logUpdate();
+        } finally {
+            lock.writeLock().unlock();
+        }
     }
 
     @Override
     public int getAvailableTickets() {
-        return queue.size();
+        lock.readLock().lock();
+        try {
+            return queue.size();
+        } finally {
+            lock.readLock().unlock();
+        }
     }
 
     @Override
     public int getAddedTickets() {
-        return added.get();
+        lock.readLock().lock();
+        try {
+            return added;
+        } finally {
+            lock.readLock().unlock();
+        }
     }
 
     @Override
     public int getPurchasedTickets() {
-        return purchased.get();
+        lock.readLock().lock();
+        try {
+            return purchased;
+        } finally {
+            lock.readLock().unlock();
+        }
     }
 
     @Override
     public int getVersion() {
-        return version.get();
+        lock.readLock().lock();
+        try {
+            return version;
+        } finally {
+            lock.readLock().unlock();
+        }
     }
 
     @Override
     public double getTotalRevenue() {
-        statsLock.lock();
+        lock.readLock().lock();
         try {
             return totalRevenue;
         } finally {
-            statsLock.unlock();
+            lock.readLock().unlock();
         }
     }
 
     @Override
     public double getTotalUnsoldValue() {
-        double sum = 0.0;
-        for (Ticket t : queue) {
-            sum += t.getPrice();
+        lock.readLock().lock();
+        try {
+            return queue.stream().mapToDouble(Ticket::getPrice).sum();
+        } finally {
+            lock.readLock().unlock();
         }
-        return sum;
     }
 
+    // ------------------ Logging Methods ------------------
     @Override
     public String getPoolInfo() {
-        return String.format("[BlockingQueue] Tickets left : %d/%d, Added: %d, Purchased: %d, Version: %d",
-                queue.size(), capacity, added.get(), purchased.get(), version.get());
+        lock.readLock().lock();
+        try {
+            return String.format("[BlockingQueue] Tickets left: %d/%d, Added: %d, Purchased: %d, Version: %d",
+                    queue.size(), capacity, added, purchased, version);
+        } finally {
+            lock.readLock().unlock();
+        }
     }
 
     @Override
     public String getLogs() {
-        logLock.lock();
+        lock.readLock().lock();
         try {
             return String.join("\n", logs);
         } finally {
-            logLock.unlock();
+            lock.readLock().unlock();
         }
     }
 
     @Override
     public void logReaderMessage(String msg) {
-        String time = logTime();
-        String entry = time + " [" + Thread.currentThread().getName() + "] " + msg;
-        logLock.lock();
+        lock.writeLock().lock();
         try {
-            logs.add(entry);
+            String time = logTime();
+            logs.add(time + " [" + Thread.currentThread().getName() + "] " + msg);
         } finally {
-            logLock.unlock();
+            lock.writeLock().unlock();
         }
     }
 
-    // ------------------ Logging Helpers (no direct prints) ------------------
     private void logWait(String state) {
         String msg = logTime() + " [" + Thread.currentThread().getName() + "] waiting (Pool " + state + ")";
-        logLock.lock();
-        try {
-            logs.add(msg);
-        } finally {
-            logLock.unlock();
-        }
+        logs.add(msg);
     }
 
     private void logAction(String action, Ticket t) {
         String msg = logTime() + " [" + Thread.currentThread().getName() + "] " + action + " " + t;
-        logLock.lock();
-        try {
-            logs.add(msg);
-        } finally {
-            logLock.unlock();
-        }
+        logs.add(msg);
     }
 
-    private void logUpdate(int newVersion) {
-        String msg = logTime() + " [" + Thread.currentThread().getName() + "] updated version to " + newVersion;
-        logLock.lock();
-        try {
-            logs.add(msg);
-        } finally {
-            logLock.unlock();
-        }
+    private void logUpdate() {
+        String msg = logTime() + " [" + Thread.currentThread().getName() + "] updated version to " + version;
+        logs.add(msg);
     }
 
     private String logTime() {
