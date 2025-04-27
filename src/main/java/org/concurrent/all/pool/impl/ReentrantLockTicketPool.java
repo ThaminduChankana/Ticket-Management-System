@@ -1,7 +1,7 @@
 package org.concurrent.all.pool.impl;
 
-import org.concurrent.reentrantlock.model.Ticket;
-import org.concurrent.reentrantlock.pool.TicketPool;
+import org.concurrent.all.model.Ticket;
+import org.concurrent.all.pool.TicketPool;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -11,7 +11,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class ReentrantLockTicketPool implements TicketPool {
-    private final List<org.concurrent.reentrantlock.model.Ticket> tickets;
+    private final List<Ticket> tickets;
     private final int capacity;
     private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock(true);
     private final Lock readLock = rwLock.readLock();
@@ -29,7 +29,7 @@ public class ReentrantLockTicketPool implements TicketPool {
     }
 
     @Override
-    public boolean addTicket(org.concurrent.reentrantlock.model.Ticket ticket) throws InterruptedException {
+    public boolean addTicket(Ticket ticket) throws InterruptedException {
         while (true) {
             writeLock.lock();
             try {
@@ -53,12 +53,12 @@ public class ReentrantLockTicketPool implements TicketPool {
     }
 
     @Override
-    public org.concurrent.reentrantlock.model.Ticket purchaseTicket() throws InterruptedException {
+    public Ticket purchaseTicket() throws InterruptedException {
         while (true) {
             writeLock.lock();
             try {
                 if (!tickets.isEmpty()) {
-                    org.concurrent.reentrantlock.model.Ticket t = tickets.remove(0);
+                    Ticket t = tickets.remove(0);
                     purchased++;
                     totalRevenue += t.getPrice();
                     logAction("Consumed", t);
@@ -141,7 +141,7 @@ public class ReentrantLockTicketPool implements TicketPool {
     public double getTotalUnsoldValue() {
         readLock.lock();
         try {
-            return tickets.stream().mapToDouble(org.concurrent.reentrantlock.model.Ticket::getPrice).sum();
+            return tickets.stream().mapToDouble(Ticket::getPrice).sum();
         } finally {
             readLock.unlock();
         }
