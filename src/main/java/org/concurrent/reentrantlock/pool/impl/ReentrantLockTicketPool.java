@@ -1,5 +1,7 @@
 package org.concurrent.reentrantlock.pool.impl;
 
+
+
 import org.concurrent.reentrantlock.model.Ticket;
 import org.concurrent.reentrantlock.pool.TicketPool;
 
@@ -7,6 +9,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -16,6 +19,8 @@ public class ReentrantLockTicketPool implements TicketPool {
     private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock(true);
     private final Lock readLock = rwLock.readLock();
     private final Lock writeLock = rwLock.writeLock();
+    private final Condition notFull = writeLock.newCondition();
+    private final Condition notEmpty = writeLock.newCondition();
     private final List<String> logs = new ArrayList<>();
     private int added = 0;
     private int purchased = 0;
@@ -30,49 +35,39 @@ public class ReentrantLockTicketPool implements TicketPool {
 
     @Override
     public boolean addTicket(Ticket ticket) throws InterruptedException {
-        while (true) {
-            writeLock.lock();
-            try {
-                if (tickets.size() < capacity) {
-                    tickets.add(ticket);
-                    added++;
-                    totalAddedValue += ticket.getPrice();
-                    logAction("Added", ticket);
-                    return true;
-                }
+        writeLock.lock();
+        try {
+            while (tickets.size() >= capacity) {
                 logWait("FULL");
-            } finally {
-                writeLock.unlock();
+                notFull.await();
             }
-
-            Thread.sleep(100);
-            if (Thread.interrupted()) {
-                throw new InterruptedException();
-            }
+            tickets.add(ticket);
+            added++;
+            totalAddedValue += ticket.getPrice();
+            logAction("Added", ticket);
+            notEmpty.signal();
+            return true;
+        } finally {
+            writeLock.unlock();
         }
     }
 
     @Override
     public Ticket purchaseTicket() throws InterruptedException {
-        while (true) {
-            writeLock.lock();
-            try {
-                if (!tickets.isEmpty()) {
-                    Ticket t = tickets.remove(0);
-                    purchased++;
-                    totalRevenue += t.getPrice();
-                    logAction("Consumed", t);
-                    return t;
-                }
+        writeLock.lock();
+        try {
+            while (tickets.isEmpty()) {
                 logWait("EMPTY");
-            } finally {
-                writeLock.unlock();
+                notEmpty.await();
             }
-
-            Thread.sleep(100);
-            if (Thread.interrupted()) {
-                throw new InterruptedException();
-            }
+            Ticket t = tickets.remove(0);
+            purchased++;
+            totalRevenue += t.getPrice();
+            logAction("Consumed", t);
+            notFull.signal();
+            return t;
+        } finally {
+            writeLock.unlock();
         }
     }
 
