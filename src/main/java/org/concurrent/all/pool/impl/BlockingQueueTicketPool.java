@@ -7,119 +7,107 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.DoubleAdder;
 
 public class BlockingQueueTicketPool implements TicketPool {
+
+    private final LinkedBlockingQueue<Ticket> queue;
     private final int capacity;
-    private final BlockingQueue<Ticket> queue;
+
+    private final AtomicInteger added        = new AtomicInteger();
+    private final AtomicInteger purchased    = new AtomicInteger();
+    private final AtomicInteger version      = new AtomicInteger();
+    private final DoubleAdder   totalRevenue = new DoubleAdder();
+    private final DoubleAdder   totalAdded   = new DoubleAdder();
+
     private final List<String> logs = new ArrayList<>();
-    private int added = 0;
-    private int purchased = 0;
-    private int version = 0;
-    private double totalRevenue = 0.0;
-    private double totalAddedValue = 0.0;
 
     public BlockingQueueTicketPool(int capacity) {
         this.capacity = capacity;
-        this.queue = new ArrayBlockingQueue<>(capacity);
+        this.queue = new LinkedBlockingQueue<>(capacity);
     }
 
     @Override
-    public synchronized boolean addTicket(Ticket ticket) throws InterruptedException {
-        while (!queue.offer(ticket)) {
-            logWait("FULL");
-            wait();
-        }
-        added++;
-        totalAddedValue += ticket.getPrice();
-        notifyAll();
+    public boolean addTicket(Ticket ticket) throws InterruptedException {
+        queue.put(ticket);
+        added.incrementAndGet();
+        totalAdded.add(ticket.getPrice());
         logAction("Added", ticket);
         return true;
     }
 
     @Override
-    public synchronized Ticket purchaseTicket() throws InterruptedException {
-        Ticket t;
-        while ((t = queue.poll()) == null) {
-            logWait("EMPTY");
-            wait();
-        }
-        purchased++;
-        totalRevenue += t.getPrice();
-        notifyAll();
-        logAction("Consumed", t);
+    public Ticket purchaseTicket() throws InterruptedException {
+        Ticket t = queue.take();
+        purchased.incrementAndGet();
+        totalRevenue.add(t.getPrice());
+        logAction("Purchased", t);
         return t;
     }
 
     @Override
-    public synchronized void performExclusiveUpdate() {
-        version++;
+    public void performExclusiveUpdate() {
+        version.incrementAndGet();
         logUpdate();
     }
 
     @Override
-    public synchronized int getAvailableTickets() {
+    public int getAvailableTickets() {
         return queue.size();
     }
 
     @Override
-    public synchronized int getAddedTickets() {
-        return added;
+    public int getAddedTickets() {
+        return added.get();
     }
 
     @Override
-    public synchronized int getPurchasedTickets() {
-        return purchased;
+    public int getPurchasedTickets() {
+        return purchased.get();
     }
 
     @Override
-    public synchronized int getVersion() {
-        return version;
+    public int getVersion() {
+        return version.get();
     }
 
     @Override
-    public synchronized double getTotalRevenue() {
-        return totalRevenue;
+    public double getTotalRevenue() {
+        return totalRevenue.sum();
     }
 
     @Override
-    public synchronized double getTotalUnsoldValue() {
+    public double getTotalUnsoldValue() {
         return queue.stream().mapToDouble(Ticket::getPrice).sum();
     }
 
     @Override
-    public synchronized String getPoolInfo() {
+    public String getPoolInfo() {
+
         return String.format("[BlockingQueue] Tickets left : %d/%d, Added: %d, Purchased: %d, Version: %d",
-                queue.size(), capacity, added, purchased, version);
+                queue.size(), capacity,
+                added.get(), purchased.get(), version.get()
+        );
     }
 
     @Override
-    public synchronized String getLogs() {
+    public String getLogs() {
         return String.join("\n", logs);
     }
 
     @Override
-    public synchronized void logReaderMessage(String msg) {
-        String time = logTime();
-        String entry = time + " [" + Thread.currentThread().getName() + "] " + msg;
-        logs.add(entry);
-    }
-
-    // ------------------ Logging Helpers ------------------
-    private void logWait(String state) {
-        String msg = logTime() + " [" + Thread.currentThread().getName() + "] waiting (Pool " + state + ")";
-        logs.add(msg);
+    public void logReaderMessage(String msg) {
+        logs.add(logTime() + " [" + Thread.currentThread().getName() + "] " + msg);
     }
 
     private void logAction(String action, Ticket t) {
-        String msg = logTime() + " [" + Thread.currentThread().getName() + "] " + action + " " + t;
-        logs.add(msg);
+        logs.add(logTime() + " [" + Thread.currentThread().getName() + "] " + action + " " + t);
     }
 
     private void logUpdate() {
-        String msg = logTime() + " [" + Thread.currentThread().getName() + "] updated version to " + version;
-        logs.add(msg);
+        logs.add(logTime() + " [" + Thread.currentThread().getName() + "] updated version to " + version.get());
     }
 
     private String logTime() {
