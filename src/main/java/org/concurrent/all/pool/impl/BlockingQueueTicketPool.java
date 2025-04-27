@@ -39,7 +39,7 @@ public class BlockingQueueTicketPool implements TicketPool {
                 logWait("FULL");
                 notFull.await();
             }
-            queue.add(ticket);
+            queue.offer(ticket);
             added++;
             totalAddedValue += ticket.getPrice();
             notEmpty.signalAll();
