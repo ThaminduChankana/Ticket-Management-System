@@ -1,8 +1,7 @@
 package org.concurrent.all.pool;
 
-import org.concurrent.blockingqueue.model.Ticket;
-import org.concurrent.blockingqueue.pool.TicketPool;
-import org.concurrent.blockingqueue.pool.impl.BlockingQueueTicketPool;
+import org.concurrent.all.model.Ticket;
+import org.concurrent.all.pool.impl.BlockingQueueTicketPool;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 

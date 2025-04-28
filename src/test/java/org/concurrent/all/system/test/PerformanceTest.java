@@ -17,11 +17,11 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.LockSupport;
 
 class PerformanceTest {
-    private static final int WARMUP_SECONDS      = 5;
-    private static final int TEST_SECONDS        = 10;
-    private static final int[] THREAD_COUNTS     = {2, 4, 16, 64};
-    private static final int POOL_CAPACITY       = 1000;
-    private static final double WRITE_RATIO      = 0.5;
+    private static final int WARMUP_SECONDS = 5;
+    private static final int TEST_SECONDS = 10;
+    private static final int[] THREAD_COUNTS = {2, 4, 16, 64};
+    private static final int POOL_CAPACITY = 1000;
+    private static final double WRITE_RATIO = 0.5;
     private static final int OPERATION_TIMEOUT_MS = 100;
 
     @Test
@@ -150,10 +150,11 @@ class PerformanceTest {
         );
     }
 
-    private record TestResult(double throughput, double avgLatencyMs) {}
-
     @FunctionalInterface
     private interface PoolCreator {
         TicketPool create(int capacity) throws Exception;
+    }
+
+    private record TestResult(double throughput, double avgLatencyMs) {
     }
 }

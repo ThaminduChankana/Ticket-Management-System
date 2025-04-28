@@ -19,12 +19,13 @@ public class ReentrantLockTicketPool implements TicketPool {
     private final Lock writeLock = rwLock.writeLock();
     private final Condition notFull = writeLock.newCondition();
     private final Condition notEmpty = writeLock.newCondition();
+
     private final List<String> logs = new ArrayList<>();
     private int added = 0;
     private int purchased = 0;
     private int version = 0;
     private double totalRevenue = 0.0;
-    private double totalAddedValue = 0.0;
+    private double totalAdded = 0.0;
 
     public ReentrantLockTicketPool(int capacity) {
         this.capacity = capacity;
@@ -32,16 +33,22 @@ public class ReentrantLockTicketPool implements TicketPool {
     }
 
     @Override
-    public boolean addTicket(Ticket ticket) throws InterruptedException {
+    public boolean addTicket(Ticket ticket) {
         writeLock.lock();
         try {
             while (tickets.size() >= capacity) {
                 logWait("FULL");
-                notFull.await();
+                try {
+                    notFull.await();
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    logs.add(logTime() + " [" + Thread.currentThread().getName() + "] INTERRUPTED while waiting to add");
+                    return false;
+                }
             }
             tickets.add(ticket);
             added++;
-            totalAddedValue += ticket.getPrice();
+            totalAdded += ticket.getPrice();
             logAction("Added", ticket);
             notEmpty.signal();
             return true;
@@ -51,17 +58,23 @@ public class ReentrantLockTicketPool implements TicketPool {
     }
 
     @Override
-    public Ticket purchaseTicket() throws InterruptedException {
+    public Ticket purchaseTicket() {
         writeLock.lock();
         try {
             while (tickets.isEmpty()) {
                 logWait("EMPTY");
-                notEmpty.await();
+                try {
+                    notEmpty.await();
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    logs.add(logTime() + " [" + Thread.currentThread().getName() + "] INTERRUPTED while waiting to purchase");
+                    return null;
+                }
             }
             Ticket t = tickets.remove(0);
             purchased++;
             totalRevenue += t.getPrice();
-            logAction("Consumed", t);
+            logAction("Purchased", t);
             notFull.signal();
             return t;
         } finally {
@@ -70,7 +83,7 @@ public class ReentrantLockTicketPool implements TicketPool {
     }
 
     @Override
-    public void performExclusiveUpdate() throws InterruptedException {
+    public void performExclusiveUpdate() {
         writeLock.lock();
         try {
             version++;
@@ -144,8 +157,10 @@ public class ReentrantLockTicketPool implements TicketPool {
     public String getPoolInfo() {
         readLock.lock();
         try {
-            return String.format("[ReentrantLock] Tickets left : %d/%d, Added: %d, Purchased: %d, Version: %d",
-                    tickets.size(), capacity, added, purchased, version);
+            return String.format(
+                    "[ReentrantLock] Tickets left: %d/%d, Added: %d, Purchased: %d, Version: %d",
+                    tickets.size(), capacity, added, purchased, version
+            );
         } finally {
             readLock.unlock();
         }
@@ -165,27 +180,24 @@ public class ReentrantLockTicketPool implements TicketPool {
     public void logReaderMessage(String msg) {
         writeLock.lock();
         try {
-            String time = logTime();
-            String entry = time + " [" + Thread.currentThread().getName() + "] " + msg;
-            logs.add(entry);
+            logs.add(logTime() + " [" + Thread.currentThread().getName() + "] " + msg);
         } finally {
             writeLock.unlock();
         }
     }
 
+    // ─── Logging helpers ────────────────────────────────────────────────────────────
+
     private void logWait(String state) {
-        String msg = logTime() + " [" + Thread.currentThread().getName() + "] waiting (Pool " + state + ")";
-        logs.add(msg);
+        logs.add(logTime() + " [" + Thread.currentThread().getName() + "] WAIT - Pool " + state);
     }
 
     private void logAction(String action, Ticket t) {
-        String msg = logTime() + " [" + Thread.currentThread().getName() + "] " + action + " " + t;
-        logs.add(msg);
+        logs.add(logTime() + " [" + Thread.currentThread().getName() + "] " + action + " " + t);
     }
 
     private void logUpdate() {
-        String msg = logTime() + " [" + Thread.currentThread().getName() + "] updated version to " + version;
-        logs.add(msg);
+        logs.add(logTime() + " [" + Thread.currentThread().getName() + "] updated version to " + version);
     }
 
     private String logTime() {

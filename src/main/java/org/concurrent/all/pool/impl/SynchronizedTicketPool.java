@@ -24,10 +24,16 @@ public class SynchronizedTicketPool implements TicketPool {
     }
 
     @Override
-    public synchronized boolean addTicket(Ticket ticket) throws InterruptedException {
+    public synchronized boolean addTicket(Ticket ticket) {
         while (tickets.size() == capacity) {
             logWait("FULL");
-            wait();
+            try {
+                wait();
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                logs.add(logTime() + " [" + Thread.currentThread().getName() + "] INTERRUPTED while waiting to add");
+                return false;
+            }
         }
         tickets.add(ticket);
         added++;
@@ -38,10 +44,16 @@ public class SynchronizedTicketPool implements TicketPool {
     }
 
     @Override
-    public synchronized Ticket purchaseTicket() throws InterruptedException {
+    public synchronized Ticket purchaseTicket() {
         while (tickets.isEmpty()) {
             logWait("EMPTY");
-            wait();
+            try {
+                wait();
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                logs.add(logTime() + " [" + Thread.currentThread().getName() + "] INTERRUPTED while waiting to purchase");
+                return null;
+            }
         }
         Ticket t = tickets.remove(0);
         purchased++;
@@ -52,7 +64,7 @@ public class SynchronizedTicketPool implements TicketPool {
     }
 
     @Override
-    public synchronized void performExclusiveUpdate() throws InterruptedException {
+    public synchronized void performExclusiveUpdate() {
         version++;
         logUpdate();
     }
@@ -89,8 +101,10 @@ public class SynchronizedTicketPool implements TicketPool {
 
     @Override
     public synchronized String getPoolInfo() {
-        return String.format("[Synchronized] Tickets left : %d/%d, Added: %d, Purchased: %d, Version: %d",
-                tickets.size(), capacity, added, purchased, version);
+        return String.format(
+                "[Synchronized] Tickets left: %d/%d, Added: %d, Purchased: %d, Version: %d",
+                tickets.size(), capacity, added, purchased, version
+        );
     }
 
     @Override
@@ -100,27 +114,25 @@ public class SynchronizedTicketPool implements TicketPool {
 
     @Override
     public synchronized void logReaderMessage(String msg) {
-        String time = logTime();
-        String entry = time + " [" + Thread.currentThread().getName() + "] " + msg;
-        logs.add(entry);
+        logs.add(logTime() + " [" + Thread.currentThread().getName() + "] " + msg);
     }
 
+    // ─── Logging helpers ────────────────────────────────────────────────────────────
+
     private void logWait(String state) {
-        String msg = logTime() + " [" + Thread.currentThread().getName() + "] waiting (Pool " + state + ")";
-        logs.add(msg);
+        logs.add(logTime() + " [" + Thread.currentThread().getName() + "] WAIT - Pool " + state);
     }
 
     private void logAction(String action, Ticket t) {
-        String msg = logTime() + " [" + Thread.currentThread().getName() + "] " + action + " " + t;
-        logs.add(msg);
+        logs.add(logTime() + " [" + Thread.currentThread().getName() + "] " + action + " " + t);
     }
 
     private void logUpdate() {
-        String msg = logTime() + " [" + Thread.currentThread().getName() + "] updated version to " + version;
-        logs.add(msg);
+        logs.add(logTime() + " [" + Thread.currentThread().getName() + "] updated version to " + version);
     }
 
     private String logTime() {
-        return LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss.SSS"));
+        return LocalDateTime.now()
+                .format(DateTimeFormatter.ofPattern("HH:mm:ss.SSS"));
     }
 }

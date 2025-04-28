@@ -16,41 +16,53 @@ public class BlockingQueueTicketPool implements TicketPool {
     private final int capacity;
     private final LinkedBlockingQueue<Ticket> queue;
 
-    private final AtomicInteger added        = new AtomicInteger();
-    private final AtomicInteger purchased    = new AtomicInteger();
-    private final AtomicInteger version      = new AtomicInteger();
-    private final DoubleAdder   totalRevenue = new DoubleAdder();
-    private final DoubleAdder   totalAdded   = new DoubleAdder();
+    private final AtomicInteger added = new AtomicInteger();
+    private final AtomicInteger purchased = new AtomicInteger();
+    private final AtomicInteger version = new AtomicInteger();
+    private final DoubleAdder totalRevenue = new DoubleAdder();
+    private final DoubleAdder totalAdded = new DoubleAdder();
 
     private final List<String> logs = new ArrayList<>();
 
     public BlockingQueueTicketPool(int capacity) {
         this.capacity = capacity;
-        this.queue    = new LinkedBlockingQueue<>(capacity);
+        this.queue = new LinkedBlockingQueue<>(capacity);
     }
 
     @Override
-    public boolean addTicket(Ticket ticket) throws InterruptedException {
-        if (queue.remainingCapacity() == 0) {
-            logWait("FULL");
+    public boolean addTicket(Ticket ticket) {
+        try {
+            if (queue.remainingCapacity() == 0) {
+                logWait("FULL");
+            }
+            queue.put(ticket);
+            added.incrementAndGet();
+            totalAdded.add(ticket.getPrice());
+            logAction("Added", ticket);
+            return true;
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            logs.add(logTime() + " [" + Thread.currentThread().getName() + "] INTERRUPTED while adding");
+            return false;
         }
-        queue.put(ticket);
-        added.incrementAndGet();
-        totalAdded.add(ticket.getPrice());
-        logAction("Added", ticket);
-        return true;
     }
 
     @Override
-    public Ticket purchaseTicket() throws InterruptedException {
-        if (queue.isEmpty()) {
-            logWait("EMPTY");
+    public Ticket purchaseTicket() {
+        try {
+            if (queue.isEmpty()) {
+                logWait("EMPTY");
+            }
+            Ticket t = queue.take();
+            purchased.incrementAndGet();
+            totalRevenue.add(t.getPrice());
+            logAction("Purchased", t);
+            return t;
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            logs.add(logTime() + " [" + Thread.currentThread().getName() + "] INTERRUPTED while purchasing");
+            return null;
         }
-        Ticket t = queue.take();
-        purchased.incrementAndGet();
-        totalRevenue.add(t.getPrice());
-        logAction("Purchased", t);
-        return t;
     }
 
     @Override
@@ -91,7 +103,8 @@ public class BlockingQueueTicketPool implements TicketPool {
 
     @Override
     public String getPoolInfo() {
-        return String.format("[BlockingQueue] Tickets left : %d/%d, Added: %d, Purchased: %d, Version: %d",
+        return String.format(
+                "[BlockingQueue] Tickets left : %d/%d, Added: %d, Purchased: %d, Version: %d",
                 queue.size(), capacity,
                 added.get(), purchased.get(), version.get()
         );
@@ -107,6 +120,8 @@ public class BlockingQueueTicketPool implements TicketPool {
         logs.add(logTime() + " [" + Thread.currentThread().getName() + "] " + msg);
     }
 
+    // ─── Logging helpers ────────────────────────────────────────────────────────────
+
     private void logAction(String action, Ticket t) {
         logs.add(logTime() + " [" + Thread.currentThread().getName() + "] " + action + " " + t);
     }
@@ -116,10 +131,12 @@ public class BlockingQueueTicketPool implements TicketPool {
     }
 
     private void logUpdate() {
-        logs.add(logTime() + " [" + Thread.currentThread().getName() + "] updated version to " + version.get());
+        logs.add(logTime() + " [" + Thread.currentThread().getName() +
+                "] updated version to " + version.get());
     }
 
     private String logTime() {
-        return LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss.SSS"));
+        return LocalDateTime.now()
+                .format(DateTimeFormatter.ofPattern("HH:mm:ss.SSS"));
     }
 }
