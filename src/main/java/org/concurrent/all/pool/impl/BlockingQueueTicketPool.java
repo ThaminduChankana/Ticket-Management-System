@@ -13,8 +13,8 @@ import java.util.concurrent.atomic.DoubleAdder;
 
 public class BlockingQueueTicketPool implements TicketPool {
 
-    private final LinkedBlockingQueue<Ticket> queue;
     private final int capacity;
+    private final LinkedBlockingQueue<Ticket> queue;
 
     private final AtomicInteger added        = new AtomicInteger();
     private final AtomicInteger purchased    = new AtomicInteger();
@@ -26,11 +26,14 @@ public class BlockingQueueTicketPool implements TicketPool {
 
     public BlockingQueueTicketPool(int capacity) {
         this.capacity = capacity;
-        this.queue = new LinkedBlockingQueue<>(capacity);
+        this.queue    = new LinkedBlockingQueue<>(capacity);
     }
 
     @Override
     public boolean addTicket(Ticket ticket) throws InterruptedException {
+        if (queue.remainingCapacity() == 0) {
+            logWait("FULL");
+        }
         queue.put(ticket);
         added.incrementAndGet();
         totalAdded.add(ticket.getPrice());
@@ -40,6 +43,9 @@ public class BlockingQueueTicketPool implements TicketPool {
 
     @Override
     public Ticket purchaseTicket() throws InterruptedException {
+        if (queue.isEmpty()) {
+            logWait("EMPTY");
+        }
         Ticket t = queue.take();
         purchased.incrementAndGet();
         totalRevenue.add(t.getPrice());
@@ -85,7 +91,6 @@ public class BlockingQueueTicketPool implements TicketPool {
 
     @Override
     public String getPoolInfo() {
-
         return String.format("[BlockingQueue] Tickets left : %d/%d, Added: %d, Purchased: %d, Version: %d",
                 queue.size(), capacity,
                 added.get(), purchased.get(), version.get()
@@ -104,6 +109,10 @@ public class BlockingQueueTicketPool implements TicketPool {
 
     private void logAction(String action, Ticket t) {
         logs.add(logTime() + " [" + Thread.currentThread().getName() + "] " + action + " " + t);
+    }
+
+    private void logWait(String state) {
+        logs.add(logTime() + " [" + Thread.currentThread().getName() + "] WAIT - Queue " + state);
     }
 
     private void logUpdate() {
