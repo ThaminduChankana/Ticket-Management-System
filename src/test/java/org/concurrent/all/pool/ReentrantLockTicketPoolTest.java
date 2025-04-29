@@ -37,6 +37,70 @@ class ReentrantLockTicketPoolTest {
     }
 
     @Test
+    void testAddBlocksWhenFull() throws InterruptedException {
+        int capacity = 3;
+        for (int i = 0; i < capacity; i++) {
+            pool.addTicket(new Ticket(String.valueOf(i), "E", 10.0));
+        }
+        assertEquals(capacity, pool.getAvailableTickets());
+
+        int initialAdded = pool.getAddedTickets();
+
+        Thread adder = new Thread(() -> {
+            try {
+                pool.addTicket(new Ticket("X", "E", 5.0));
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }, "Adder");
+        adder.start();
+
+        Thread.sleep(100);
+        assertTrue(adder.isAlive(), "addTicket should block when full");
+
+        Ticket freed = pool.purchaseTicket();
+        assertNotNull(freed);
+
+        adder.join(500);
+        assertFalse(adder.isAlive(), "addTicket should unblock after purchase");
+
+        assertEquals(initialAdded + 1, pool.getAddedTickets(),
+                "Added count should increment by one");
+        assertEquals(capacity, pool.getAvailableTickets(),
+                "Pool should return to full after unblock");
+    }
+
+    @Test
+    void testPurchaseBlocksWhenEmpty() throws InterruptedException {
+        assertEquals(0, pool.getAvailableTickets());
+        int initialPurchased = pool.getPurchasedTickets();
+
+        Thread consumer = new Thread(() -> {
+            try {
+                pool.purchaseTicket();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }, "Consumer");
+        consumer.start();
+
+        Thread.sleep(100);
+        assertTrue(consumer.isAlive(), "purchaseTicket should block when empty");
+
+        Ticket t = new Ticket("Z", "E", 15.0);
+        pool.addTicket(t);
+
+        consumer.join(500);
+        assertFalse(consumer.isAlive(), "purchaseTicket should unblock after add");
+
+        assertEquals(initialPurchased + 1, pool.getPurchasedTickets(),
+                "Purchased count should increment by one");
+        assertEquals(0, pool.getAvailableTickets(),
+                "Pool should be empty again after the purchase");
+    }
+
+
+    @Test
     void testPerformExclusiveUpdate() throws InterruptedException {
         assertEquals(0, pool.getVersion());
         pool.performExclusiveUpdate();
